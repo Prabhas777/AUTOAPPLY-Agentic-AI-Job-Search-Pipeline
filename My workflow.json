@@ -1,0 +1,1149 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "[YOUR_GOOGLE_DRIVE_URL]",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -704,
+        576
+      ],
+      "id": "561162d5-e2fb-4882-ad05-c8145c065bae",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "qmLYZAc3kHygKMtj",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        576
+      ],
+      "id": "1c567384-e64f-4ee4-8b5f-1498922426c2",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "[YOUR_GOOGLE_SHEET_URL]",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Filter",
+          "cachedResultUrl": "[YOUR_GOOGLE_SHEET_URL]"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -288,
+        576
+      ],
+      "id": "493dd77c-a051-4b87-acb5-336fde2ed59b",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PRgnbMwYrVL2Znx4",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Base URL: f_TPR=r3600 (Last 1 hour) | f_JT=F,C (Full-Time AND Contract)\nlet url = \"https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_JT=F,C,I&sortBy=DD\";\n\n// 2. Fetch inputs from Google Sheets\nconst baseKeyword = $input.first().json.Keyword || \"\";\nconst location = $input.first().json.Location || \"\";\nconst experienceLevel = $input.first().json['Experience Level'] || \"\";\nconst remote = $input.first().json.Remote || \"\";\nconst easyApply = $input.first().json['Easy Apply'] || \"\";\n\n// 3. Inject Anti-Spam into the Keyword string (UPDATED with AI evaluation spam)\nconst spamBlocker = \"NOT Turing NOT Canonical NOT BairesDev NOT Crossover NOT Revature NOT SynergisticIT NOT Outlier NOT \\\"Scale AI\\\" NOT DataAnnotation NOT Mercor NOT Alignerr\";\nconst keyword = baseKeyword ? `${baseKeyword} ${spamBlocker}` : spamBlocker;\n\nurl += `&keywords=${encodeURIComponent(keyword)}`;\n\nif (location != \"\") {\n  url += `&location=${encodeURIComponent(location)}`;\n}\n\n// 4. Case-Insensitive Experience Level Mapping (1=Intern, 2=Entry, 3=Associate)\nif (experienceLevel !== \"\") {\n  const transformedExperiences = experienceLevel\n    .split(\",\")\n    .map((exp) => {\n      const cleanExp = exp.trim().toLowerCase();\n      if (cleanExp === \"internship\") return \"1\";\n      if (cleanExp === \"entry level\") return \"2\";\n      if (cleanExp === \"associate\") return \"3\";\n      return \"\";\n    })\n    .filter(Boolean);\n\n  if (transformedExperiences.length > 0) {\n    url += `&f_E=${transformedExperiences.join(\",\")}`;\n  }\n}\n\n// 5. Case-Insensitive Remote Mapping\nif (remote != \"\") {\n  const transformedRemote = remote\n    .split(\",\")\n    .map((e) => {\n      const cleanRemote = e.trim().toLowerCase();\n      if (cleanRemote === \"remote\") return \"2\";\n      if (cleanRemote === \"hybrid\") return \"3\";\n      if (cleanRemote === \"on-site\") return \"1\";\n      return \"\";\n    })\n    .filter(Boolean);\n\n  if (transformedRemote.length > 0) {\n    url += `&f_WT=${transformedRemote.join(\",\")}`;\n  }\n}\n\n// 6. Easy Apply Mapping\nif (easyApply === true || easyApply === \"true\" || String(easyApply).toLowerCase() === \"yes\") {\n  url += \"&f_EA=true\";\n}\n\nreturn { url };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        576
+      ],
+      "id": "4ec16463-fb11-40c1-a6ee-a5870d82230f",
+      "name": "LinkedIn Search URL"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        576
+      ],
+      "id": "c5d31f5d-b6c9-4424-969f-7d6efc194d3b",
+      "name": "Fetch jobs from LinkedIn"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "jobs",
+              "cssSelector": "ul.jobs-search__results-list li div a[class*=\"base-card\"]",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        576
+      ],
+      "id": "f83ae91d-590f-4cfb-8d16-0467c16f6fbd",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "jobs",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        544,
+        576
+      ],
+      "id": "0143ef18-a7c0-4976-b497-480d27bba4d1",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1264,
+        1456
+      ],
+      "id": "45a00aed-84d9-4f2b-b1d2-3b9bf77f067d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $json.jobs }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_JINA_API_KEY_HERE"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Target-Selector",
+              "value": ".description__text, .show-more-less-html__markup"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -736,
+        784
+      ],
+      "id": "7ff0b8c8-2136-487d-9ebc-37aea3b7b475",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "240418dc-3349-48d5-ba59-3aa590d71950",
+              "name": "Description",
+              "value": "={{ $json.data.content }}",
+              "type": "string"
+            },
+            {
+              "id": "7b24938f-8b47-488d-9f65-54d036dcffd5",
+              "name": "Job ID",
+              "value": "={{ $('Loop Over Items').item.json.jobs.match(/\\d{9,10}/)[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "d6addada-9e01-464f-a768-c19f6224c491",
+              "name": "Apply Link",
+              "value": "={{ $('Loop Over Items').item.json.jobs }}",
+              "type": "string"
+            },
+            {
+              "id": "21c89d3a-c8b6-44eb-9719-9ae5716a7c76",
+              "name": "Title",
+              "value": "={{ $json.data.title }}",
+              "type": "string"
+            },
+            {
+              "id": "da713845-9a81-486e-bff2-1613105e424d",
+              "name": "Company",
+              "value": "={{ $json.data.title.split(\" hiring \")[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "1a9a31dd-8d51-4f35-b6b6-ca8a348de5d7",
+              "name": "Location",
+              "value": "={{ $json.data.title.split(\" in \")[1]?.split(\" | \")[0] || \"Unknown\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        784
+      ],
+      "id": "6b77c8f0-50df-499f-9139-cb6929c9c59a",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ (() => {\n  // 1) Read AI Agent 1 output\n  const raw = String($input.item.json.output || '');\n\n  // 2) FOOLPROOF RECOVERY: Bypass n8n's broken item linking\n  // Grab ALL items that have passed through Edit Fields so far\n  const editFieldsItems = $items(\"Edit Fields\");\n  // The CURRENT job is always the very last item in that array\n  const currentJobData = editFieldsItems && editFieldsItems.length > 0 \n      ? editFieldsItems[editFieldsItems.length - 1].json \n      : {};\n\n  // Grab the master resume from the very start of the workflow\n  const resumeItems = $items(\"Extract from File\");\n  const masterResumeText = resumeItems && resumeItems.length > 0 \n      ? resumeItems[0].json.text \n      : \"\";\n\n  // 3) Clean JSON fences & quotes\n  let s = raw.replace(/`{2,3}(?:json)?\\s*/gi, '').replace(/\\s*`{3}\\s*$/gi, '');\n  s = s.replace(/[\\u201C\\u201D]/g, '\"').replace(/\\u2019/g, \"'\");\n\n  const endIdx = s.indexOf('END_OF_JSON');\n  if (endIdx !== -1) s = s.slice(0, endIdx);\n\n  const start = s.indexOf('{');\n  if (start < 0) return { ...currentJobData, master_resume: masterResumeText };\n\n  let depth = 0, inStr = false, esc = false, end = -1;\n  for (let i = start; i < s.length; i++) {\n    const ch = s[i];\n    if (inStr) {\n      if (esc) { esc = false; }\n      else if (ch === '\\\\') { esc = true; }\n      else if (ch === '\"') { inStr = false; }\n    } else {\n      if (ch === '\"') inStr = true;\n      else if (ch === '{') depth++;\n      else if (ch === '}') { depth--; if (depth === 0) { end = i + 1; break; } }\n    }\n  }\n\n  if (end < 0) return { ...currentJobData, master_resume: masterResumeText };\n  const cleaned = s.slice(start, end).trim();\n\n  try {\n    const parsed = JSON.parse(cleaned);\n    // 4) Merge Original Job + Master Resume + AI Math Score safely!\n    return { \n      ...currentJobData, \n      master_resume: masterResumeText, \n      ...parsed \n    };\n  } catch (e) {\n    return { ...currentJobData, master_resume: masterResumeText };\n  }\n})() }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        1232
+      ],
+      "id": "5518b2f9-976e-49fd-a6c7-fe202d43e17f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "sendTo": "[YOUR EMAIL]",
+        "subject": "Job search results",
+        "emailType": "text",
+        "message": "Hey, your job search results with resume changes are ready in your sheet for today",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1568,
+        1344
+      ],
+      "id": "4003fea1-933e-495e-9bdd-0012df9419d6",
+      "name": "Send a message",
+      "webhookId": "f0d6158b-a72b-4e84-8f3e-0e8ecfaeda72",
+      "executeOnce": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "AARbbic33iFEjd4N",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 22 8 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 9 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 10 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 11 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 12 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 13 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 14 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 15 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 16 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 17 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 18 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 19 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 20 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 21 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 22 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 22 23 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -960,
+        576
+      ],
+      "id": "d55c9d24-7c31-4a80-9945-0140de2e8cda",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "[YOUR_GOOGLE_SHEET_URL]",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 11035642,
+          "mode": "list",
+          "cachedResultName": "Result",
+          "cachedResultUrl": "[YOUR_GOOGLE_SHEET_URL]"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Link": "={{ $('Edit Fields').item.json['Apply Link'] }}",
+            "Title": "={{ $('Edit Fields').item.json.Title }}",
+            "Company": "={{ $('Edit Fields').item.json.Company }}",
+            "Locaton": "={{ $('Edit Fields').item.json.Location }}",
+            "Score": "={{ $('Edit Fields1').item.json.match_score }}",
+            "Skills": "={{ $('Edit Fields1').item.json.job_analysis.must_have_skills.join(', ') }}",
+            "LaTex Resume": "={{ $('Code in JavaScript').item.json.output }}",
+            "Date Found": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "PDF Resume Link": "={{ $json.webViewLink }}"
+          },
+          "matchingColumns": [
+            "Link"
+          ],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Locaton",
+              "displayName": "Locaton",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Link",
+              "displayName": "Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Skills",
+              "displayName": "Skills",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LaTex Resume",
+              "displayName": "LaTex Resume",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date Found",
+              "displayName": "Date Found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PDF Resume Link",
+              "displayName": "PDF Resume Link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        1216
+      ],
+      "id": "ce8ceae8-6af0-4e9a-97b9-6b7e0eb8e333",
+      "name": "Append or update row in sheet",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PRgnbMwYrVL2Znx4",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "value": "YOUR_GCP_PROJECT_ID",
+          "mode": "id"
+        },
+        "modelName": "gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleVertex",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        1200
+      ],
+      "id": "332a420e-f3e4-4f8e-bea3-548896d314fe",
+      "name": "Google Vertex Chat Model",
+      "credentials": {
+        "googleApi": {
+          "id": "Ecmd2yqfK0nOMCvE",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "value": "YOUR_GCP_PROJECT_ID",
+          "mode": "id"
+        },
+        "modelName": "gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleVertex",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        1376
+      ],
+      "id": "4b4b15f3-1745-4f27-95e5-1e3f77c55539",
+      "name": "Google Vertex Chat Model1",
+      "credentials": {
+        "googleApi": {
+          "id": "Ecmd2yqfK0nOMCvE",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Initialize n8n's \"Memory\" to track seen jobs\nconst staticData = $getWorkflowStaticData('global');\nstaticData.seenJobs = staticData.seenJobs ||[];\n\nconst description = $input.item.json.Description || \"\";\nconst title = $input.item.json.Title || \"\";\nconst company = $input.item.json.Company || \"\";\n\n// 2. Create the Composite Key (e.g., \"google - data engineer\")\nconst compositeKey = `${company} - ${title}`.toLowerCase().trim();\nconst textToCheck = (title + \" \" + company + \" \" + description).toLowerCase();\n\nlet passesFilter = true;\nlet reason = \"Clean\"; \n\n// ==========================================\n// FILTER 1: Deduplication Check (Fastest)\n// ==========================================\nif (staticData.seenJobs.includes(compositeKey)) {\n    passesFilter = false;\n    reason = `Rejected: Duplicate Role (${compositeKey})`;\n} else {\n    // If it's a new job, save it to the memory so we don't process it again\n    staticData.seenJobs.push(compositeKey);\n}\n\n// ==========================================\n// FILTER 2: Safe Phrases & Bad Keywords\n// ==========================================\n// Only run the heavy text scanning if it's NOT a duplicate\nif (passesFilter) {\n    // Safe phrases: Bypass the C2C filter if the job explicitly states it is W2\n    const safePhrases =[\"no c2c\", \"not c2c\", \"w2 only\", \"w-2 only\", \"w2 candidates only\", \"no corp to corp\", \"no corp-to-corp\"];\n    let hasSafePhrase = safePhrases.some(phrase => textToCheck.includes(phrase));\n\n    // Strict Clearance & Citizenship\n    const badKeywords =[\n      \"u.s. citizen\", \"us citizen\", \"u.s. citizens only\", \"green card\", \n      \"permanent resident only\", \"u.s. person\", \"security clearance\", \n      \"active clearance\", \"top secret\", \"ts/sci\", \"export control\", \n      \"department of defense\", \"us government\", \n      \"defense contractor\", \"aerospace & defense\", \n      \"raytheon\", \"lockheed martin\", \"northrop grumman\"\n    ];\n    const strictClearanceKeywords =[\"secret\", \" sci \", \" dod \"];\n\n    // Contract constraints (1099/C2C)\n    const contractKeywords =[\"independent contractor\", \"freelance\", \"corp-to-corp\", \"corp to corp\", \"self-employed\"];\n    const strictContractKeywords = [\"1099\", \"c2c\"];\n\n    // Check standard clearance/citizenship phrases\n    for (const kw of badKeywords) {\n      if (textToCheck.includes(kw)) {\n        passesFilter = false;\n        reason = `Rejected: Found '${kw}'`;\n        break;\n      }\n    }\n\n    if (passesFilter) {\n      for (const kw of strictClearanceKeywords) {\n        const regex = new RegExp(`\\\\b${kw}\\\\b`, 'i');\n        if (regex.test(textToCheck)) {\n          passesFilter = false;\n          reason = `Rejected: Found strict clearance word '${kw}'`;\n          break;\n        }\n      }\n    }\n\n    // Check 1099/C2C ONLY IF it doesn't have a \"No C2C\" safe phrase\n    if (passesFilter && !hasSafePhrase) {\n      for (const kw of contractKeywords) {\n        if (textToCheck.includes(kw)) {\n          passesFilter = false;\n          reason = `Rejected: Found contract word '${kw}'`;\n          break;\n        }\n      }\n      \n      if (passesFilter) {\n        for (const kw of strictContractKeywords) {\n          const regex = new RegExp(`\\\\b${kw}\\\\b`, 'i');\n          if (regex.test(textToCheck)) {\n            passesFilter = false;\n            reason = `Rejected: Found strict contract word '${kw}'`;\n            break;\n          }\n        }\n      }\n    }\n}\n\n// Return the final decision\nreturn {\n  json: {\n    ...$input.item.json,\n    passes_filter: passesFilter,\n    reject_reason: reason\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        784
+      ],
+      "id": "ef556069-9634-4928-9f08-e1bce9f3549d",
+      "name": "Pre-Filter Logic"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1c058e76-7958-4fa5-b136-2051614e4182",
+              "leftValue": "={{ $json.passes_filter }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -128,
+        784
+      ],
+      "id": "eb29e6d6-4685-4ab9-8549-3f1f5e18d396",
+      "name": "Is Job Good?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a57c7afb-0830-4e11-8e10-4880afea7378",
+              "leftValue": "={{ $json.match_score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "1cedc5ac-ec0d-4ea1-90c8-ee3f6033255d",
+              "leftValue": "={{ $json.semantic_hard_reject }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "={{ false }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -384,
+        1456
+      ],
+      "id": "97ea3d45-5a55-48b6-9f16-81a891aa5678",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are an elite technical resume curator. Your goal is to pass ATS screening by carefully selecting the most relevant true experiences from my \"Master Resume Bank\", ensuring the final output fits on exactly 1 page.\n\nINPUTS:\njob_description: {{ $json.Description }}\nmy_master_resume_bank: \nTechnical Skills (Master Dictionary) \n\nLanguages & Core Utilities: \nPython, SQL, JavaScript, Bash, C++, Regex, JSON, LaTeX. \n\nGenerative AI, LLMs & Agentic Frameworks: \nRetrieval-Augmented Generation (RAG), Multi-Agent Systems, Agentic Workflows, LangChain, AWS Bedrock, Google Vertex AI, Claude 3.5 Sonnet, Gemini 2.5 Pro, Prompt Engineering, Amazon Titan Embeddings, Amazon OpenSearch, Vector Similarity Search, BM25 Hybrid Search, AI Safety, Hallucination Prevention, LLMOps, Jina AI, Smart Context Chunking. \n\nData Engineering & Big Data Infrastructure: \nAWS Glue, PySpark, Apache Kafka, Amazon Redshift, Amazon DynamoDB, Amazon Athena, Medallion Architecture (Bronze/Silver/Gold Data Lake), ETL/ELT Pipelines, Relational Database Design (BCNF), Composite Indexing, Data Preprocessing, Feature Extraction. \n\nCloud Computing & DevOps (AWS/GCP): \nAmazon S3, Amazon EC2, AWS Lambda, Kubernetes (Amazon EKS), AWS VPC, AWS IAM (Least-Privilege), Terraform, AWS CloudFormation (IaC), Amazon CloudWatch, AWS X-Ray, Amazon SageMaker, AWS IoT Core, Amazon EventBridge, AWS Transfer Family (SFTP), CI/CD, Docker. \n\nMachine Learning, Deep Learning & CV: \nTensorFlow, Keras, PyTorch, Scikit-Learn, OpenCV, Convolutional Neural Networks (CNNs / VGG-13), Transfer Learning, Matrix Factorization (SVD), Decision Trees, K-Nearest Neighbors (KNN), Naive Bayes, Data Augmentation, Hyperparameter Tuning (L2 Regularization, Dropout, Early Stopping), Predictive Analytics, Recommender Systems, RMSE Metrics, MLOps. \n\nBackend, APIs & Workflow Orchestration: \nn8n (Workflow Automation), Flask, FastAPI, RESTful APIs, Bootstrap, React, Headless Ingestion, OAuth (Gmail/Google Drive APIs), Slack API Integration, Cron Scheduling, MQTT. \n\n \n\nCommunity Dreams (NGO) \n\nAI & Automation Engineer | Dec 2025 – Present \n\nArchitected an end-to-end Multi-Agent Grant Intelligence pipeline to automate the ingestion and evaluation of 50+ page government RFPs, reducing manual staff review time by 94% (from 3 hours to 10 minutes per document). \n\nEngineered robust data ingestion pipelines using Python to securely extract daily grant opportunities directly from Grants.gov REST APIs and RSS feeds, replacing brittle web scrapers with highly reliable data streams. \n\nImplemented a deterministic Regex-based Python rules engine to act as a hard pre-filter, automatically dropping legally incompatible grants prior to LLM processing to drastically reduce API compute costs. \n\nDeveloped an evaluation agent utilizing Google Vertex AI (Gemini) and a custom RAG architecture to cross-reference complex RFP constraints against the NGO’s internal knowledge base of historical metrics and budgets. \n\nEnforced strict model grounding by configuring the Vertex AI agent to output validated JSON containing match scores, compliance risks, and exact document page citations, enabling rapid human verification and preventing hallucinations. \n\nOrchestrated a conditional generative workflow where RFPs scoring above an 80% threshold automatically triggered a secondary LLM agent to draft a preliminary Letter of Inquiry (LOI) and a customized missing-information checklist. \n\nAutomated end-to-end document compilation by writing scripts to dynamically inject structured JSON outputs into a LaTeX compiler, generating highly formatted, standardized \"Grant Opportunity Brief\" PDFs. \n\nStreamlined enterprise delivery by securely routing all generated PDFs to Amazon S3 and integrating the Slack API to trigger real-time, actionable alerts for NGO directors. \n\nDesigned the architecture strictly as a \"Human-in-the-Loop\" decision support system, ensuring the AI handled heavy document processing while directors maintained absolute authority over final submissions. \n\n \n\nDreamStudio Model.Earth \n\nAI Engineer | May 2025 – Nov 2025 \n\nEngineered an enterprise Retrieval-Augmented Generation (RAG) system unifying 10,000+ scattered technical documents in Amazon S3, enabling natural language querying that reduced manual engineering search time by 70%. \n\nBuilt automated document ingestion pipelines using AWS Textract to perform robust OCR, successfully extracting clean, usable text from complex, unstructured scanned PDFs and Markdown files. \n\nDeveloped advanced data preprocessing workflows natively within Amazon SageMaker using LangChain to clean formatting artifacts, apply metadata tags, and execute context-aware smart chunking (500–1000 tokens, 200-token overlap). \n\nTransformed unstructured text chunks into high-dimensional semantic representations using Amazon Titan Embeddings, indexing the vectors into an Amazon OpenSearch database for highly scalable storage and retrieval. \n\nArchitected a Hybrid Retrieval search engine within OpenSearch, merging BM25 exact-keyword matching (for technical IDs/acronyms) with Vector Similarity search to achieve sub-second, highly relevant context retrieval. \n\nDeployed Claude 3.5 Sonnet via AWS Bedrock to serve as the core generative engine, capitalizing on its fast inference latency and superior instruction-following capabilities for complex technical question-answering. \n\nEliminated model hallucinations by engineering strict, citation-based prompt templates via LangChain, forcing the AI to ground all answers exclusively in retrieved S3 context and achieving a 97% retrieval precision rate. \n\nEstablished comprehensive LLMOps observability by integrating AWS X-Ray to trace millisecond latency across the end-to-end retrieval-generation workflow. \n\nMonitored system reliability and API performance using Amazon CloudWatch, implementing custom dashboards to track system health, identify query bottlenecks, and debug retrieval failures in real-time. \n\n \n\nBig Data Science Research Solutions \n\nCloud Data Engineer | Dec 2022 – Jan 2024 \n\nArchitected a highly scalable ETL pipeline using AWS Glue (PySpark) to ingest, clean, and deduplicate millions of daily EHR medical records from Amazon S3 into an Amazon Redshift data warehouse, serving as the primary training engine for predictive ML models. \n\nEngineered a high-throughput, real-time streaming architecture using Apache Kafka deployed on Kubernetes (Amazon EKS) and EC2 to capture live MQTT telemetry data from cellular IoT biosensor patches via AWS IoT Core, reducing data ingestion latency by 60%. \n\nDesigned an event-driven anomaly detection system using Amazon EventBridge and AWS Lambda to instantly scan incoming IoT data streams, automatically routing corrupted or dropped packets to Amazon DynamoDB to enable zero-delay adjustments for downstream ML models. \n\nSecured highly sensitive healthcare data by provisioning locked-down, private cloud infrastructure within an AWS VPC using Terraform, implementing strict AWS IAM least-privilege roles and automated PII masking protocols to ensure regulatory compliance. \n\nFacilitated secure external hospital data uploads via AWS Transfer Family (SFTP) into isolated S3 buckets, and configured Amazon Athena to enable data scientists to execute complex, serverless SQL queries directly against raw JSON/CSV files for ad-hoc hypothesis testing. \n\nSpearheaded a cloud FinOps initiative by profiling and refactoring slow-running PySpark code within AWS Glue jobs and right-sizing underlying EC2 compute nodes, successfully reducing the total AWS cloud compute bill by 15%. \n\nAutomated the provisioning, scaling, and deployment of containerized and serverless data infrastructure using a dual IaC approach with Terraform and AWS CloudFormation, significantly accelerating deployment lifecycles and standardizing environments. \n\nEnsured highly reliable pipeline execution by implementing comprehensive monitoring, distributed logging, and alerting systems using Amazon CloudWatch dashboards, proactively preventing system crashes across the microservices architecture. \n\nBridged the gap between data engineering and machine learning by designing a structured Bronze/Silver/Gold data lake topology, ensuring ML research teams had continuous, high-fidelity access to both historical batch data and low-latency streaming features. \n\n \n\nProject 1: Readify – ML Recommendation Engine \n\nTech: Python, Flask, Scikit-Learn, Machine Learning, Matrix Factorization, MLOps | Jan 2024 – May 2024 \n\n \n\nEngineered a full-stack, highly personalized Machine Learning recommendation engine designed to overcome sparse dataset limitations and predict user preferences. \n\nDesigned a rigorous ML evaluation pipeline to benchmark and backtest six distinct classification algorithms, including Decision Trees, K-Nearest Neighbors (KNN), and Naive Bayes. \n\nSolved severe sparse data constraints by implementing Collaborative Filtering via Singular Value Decomposition (SVD), utilizing matrix factorization to successfully map latent relationships between users and items. \n\nTracked and optimized rigorous statistical performance metrics, analyzing Precision-Recall curves to achieve an RMSE (Root Mean Square Error) of 0.89 and a peak model accuracy of 83%. \n\nTransitioned the model from a Jupyter Notebook research environment into a production-ready RESTful inference pipeline using Flask, enabling sub-second, dynamic recommendation generation. \n\nDeveloped a responsive frontend utilizing Bootstrap and JavaScript to allow users to upload localized datasets and seamlessly interact with the underlying predictive API. \n\nProject 2: TrueVision – Real-Time Computer Vision System \n\nTech: Python, TensorFlow, Keras, OpenCV, Deep Learning, CNNs, VGG-13 | Jun 2024 – Jul 2024 \n\nArchitected a real-time Computer Vision accessibility application engineered to provide visually impaired individuals with instant audio feedback translating human facial expressions. \n\nDesigned and trained a Convolutional Neural Network (CNN) based on the VGG-13 architecture to classify complex, nuanced human emotions using the 36,000+ image FER2013 dataset. \n\nOvercame strict data limitations and lighting variance by applying aggressive Data Augmentation techniques and utilizing Transfer Learning from pre-trained ImageNet model weights. \n\nPrevented severe neural network overfitting by implementing mathematical constraints including L2 Regularization, tuning Dropout rates to 0.5, and utilizing validation-loss Early Stopping. \n\nSuccessfully forced the network to learn robust, generalized facial features, achieving a peak evaluation accuracy of 78% and reducing false positives on highly nuanced emotions (e.g., fear vs. disgust) by 18%. \n\nIntegrated the optimized deep learning model with OpenCV to capture and process live video streaming feeds, ensuring low-latency, real-time edge inference. \n\nProject 3: StreamFlix – ML Feature Pipeline & Churn Analytics \n\nTech: SQL, Relational Databases, Data Engineering, Query Profiling, Predictive Analytics |Jan 2024 – May 2024 \n\nEngineered a high-performance predictive analytics pipeline designed to identify at-risk users, calculate Customer Lifetime Value (CLV), and drive Customer Churn prevention models. \n\nArchitected a highly normalized, Boyce-Codd Normal Form (BCNF) relational database to systematically track millions of customer interactions, billing histories, and product subscriptions. \n\nConducted extensive query execution plan analysis to identify heavy data retrieval bottlenecks caused by complex SQL joins during ML feature extraction. \n\nStrategically eliminated expensive sequential table scans by implementing Composite Indexing across heavily joined columns (CustomerID, SubscriptionStartDate). \n\nDrastically improved database retrieval speeds through targeted indexing, reducing complex query execution time by over 50% (from 6.7 milliseconds down to 3.1 milliseconds). \n\nEnsured seamless, near real-time data availability for downstream Data Scientists, bridging the gap between raw relational data and high-fidelity machine learning feature pipelines. \n\n \n\nProject 4: AutoApply AI – Autonomous Agentic Workflow \n\nTech: n8n, Google Vertex AI (Gemini), JavaScript, REST APIs, Jina AI, Regex, LaTeX | Apr 2026 – Present \n\nArchitected an autonomous Agentic AI workflow utilizing n8n to orchestrate end-to-end job sourcing, semantic evaluation, and dynamic document generation, eliminating 3+ hours of manual daily processing. \n\nEngineered headless data ingestion pipelines leveraging the Jina AI API to reliably extract clean, semi-structured text from complex web pages and LinkedIn job postings, bypassing traditional scraping bottlenecks. \n\nDesigned a deterministic JavaScript and Regex rules engine to act as a pre-LLM firewall, instantly rejecting non-compliant (1099/C2C) opportunities to guarantee visa constraints and drastically reduce API compute costs. \n\nOrchestrated a multi-agent evaluation framework using Google Vertex AI (Gemini 2.5 Pro), deploying an \"Evaluator Agent\" to semantically score job requirements against a master historical database of skills and experiences. \n\nEnforced strict zero-hallucination constraints on a secondary \"Tailor Agent\" through advanced prompt engineering, transforming matched data into highly structured JSON outputs without fabricating technical claims. \n\nAutomated end-to-end document rendering by writing scripts to dynamically map AI-generated JSON outputs into LaTeX templates, invoking external REST APIs to compile pixel-perfect, ATS-compliant PDFs. \n\nStreamlined delivery and monitoring by integrating Google Drive/Sheets APIs and Gmail OAuth to securely route finalized PDFs, log pipeline metrics, and trigger real-time notifications for high-confidence matches. \n\nImplemented robust scheduling using cron-based triggers to execute the headless pipeline at standard intervals, ensuring continuous, automated lead generation and error-handling without manual intervention. \n\nEducation:\nState University of New York at Buffalo | Jan 2024 – May 2025\nMaster of Science in Computer Science\n\nIIITDM Jabalpur | Jul 2019 – May 2023\nBachelor's of Science in Computer Science and Engineering\n\nCertifications:\nAWS Certified Solutions Architect – Associate | Issued: Mar 2024 | Credential ID: 65b51979b0c548cdbc8472fd6a3c2034\n\nSTRICT CURATION RULES (ANTI-HALLUCINATION):\n1. SELECT EXACTLY 3 EXPERIENCES: Choose the 3 jobs from my Master Bank that best align with the JD. \n2. SELECT EXACTLY 2 PROJECTS: Choose the 2 projects from my Master Bank that best align with the JD.\n3. SELECT EXACTLY 3 BULLETS PER ITEM: For each chosen job and project, select exactly 3 bullet points from my Master Bank that contain the highest density of keywords found in the JD. \n4. NO CREATIVE WRITING: Do not invent new skills, metrics, or technologies. You may lightly trim the selected bullets for brevity to fit on one page, but the core facts must remain identical to the Master Bank.\n5. NO TITLE INFLATION: You must use my exact Job Titles, Companies, Tech, and Dates exactly as they appear in the Master Bank.\n6. DYNAMIC SKILLS EXTRACTION: Review the Master Bank \"Technical Skills\" section. Select a total of 15 to 20 skills that best match the Job Description and categorize them strictly into the 6 JSON buckets below.\n\nFORMAT: Output NOTHING but a raw JSON object. Do NOT use markdown code fences. Do NOT echo the inputs. Escape all internal quotes.\n\nSCHEMA:\n{\n  \"summary\": \"Crisp 3-line summary tailored to the JD based ONLY on the true experience in my bank.\",\n  \"skills_languages\": \"Python, SQL, JavaScript...\",\n  \"skills_cloud_devops\": \"AWS S3, Terraform, Docker...\",\n  \"skills_data_engineering\": \"Apache Kafka, PySpark, AWS Glue...\",\n  \"skills_genai_llms\": \"LangChain, RAG, AWS Bedrock...\",\n  \"skills_ml_cv\": \"TensorFlow, OpenCV, Scikit-Learn...\",\n  \"skills_backend_apis\": \"n8n, FastAPI, REST APIs...\",\n  \"experiences\":[\n    {\n      \"title\": \"[Exact Title selected from Master Bank]\",\n      \"company\": \"[Exact Company selected from Master Bank]\",\n      \"dates\": \"[Exact Dates selected from Master Bank]\",\n      \"location\": \"Remote\",\n      \"bullets\": [\n        \"[Selected bullet 1]\", \n        \"[Selected bullet 2]\", \n        \"[Selected bullet 3]\"\n      ]\n    }\n  ],\n  \"projects\":[\n    {\n      \"title\": \"[Exact Title selected from Master Bank]\",\n      \"tech\": \"[Exact Tech selected from Master Bank]\",\n      \"dates\": \"[Exact Dates selected from Master Bank]\",\n      \"bullets\":[\n        \"[Selected bullet 1]\", \n        \"[Selected bullet 2]\", \n        \"[Selected bullet 3]\"\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -16,
+        1232
+      ],
+      "id": "20daaa01-6ccc-49b2-960d-fd4a5c63ad9a",
+      "name": "AI Agent 2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a precise, highly pragmatic Applicant Tracking System (ATS) matching assistant.\n\nReturn ONE JSON object wrapped in ```json fences, followed by the line END_OF_JSON. No extra prose. No Markdown inside the JSON.\n\nINPUTS:\njob_description: {{ $json.Description }}\nmy_resume: \n\n\nTechnical Skills (Master Dictionary) \n\nLanguages & Core Utilities: \nPython, SQL, JavaScript, Bash, C++, Regex, JSON, LaTeX. \n\nGenerative AI, LLMs & Agentic Frameworks: \nRetrieval-Augmented Generation (RAG), Multi-Agent Systems, Agentic Workflows, LangChain, AWS Bedrock, Google Vertex AI, Claude 3.5 Sonnet, Gemini 2.5 Pro, Prompt Engineering, Amazon Titan Embeddings, Amazon OpenSearch, Vector Similarity Search, BM25 Hybrid Search, AI Safety, Hallucination Prevention, LLMOps, Jina AI, Smart Context Chunking. \n\nData Engineering & Big Data Infrastructure: \nAWS Glue, PySpark, Apache Kafka, Amazon Redshift, Amazon DynamoDB, Amazon Athena, Medallion Architecture (Bronze/Silver/Gold Data Lake), ETL/ELT Pipelines, Relational Database Design (BCNF), Composite Indexing, Data Preprocessing, Feature Extraction. \n\nCloud Computing & DevOps (AWS/GCP): \nAmazon S3, Amazon EC2, AWS Lambda, Kubernetes (Amazon EKS), AWS VPC, AWS IAM (Least-Privilege), Terraform, AWS CloudFormation (IaC), Amazon CloudWatch, AWS X-Ray, Amazon SageMaker, AWS IoT Core, Amazon EventBridge, AWS Transfer Family (SFTP), CI/CD, Docker. \n\nMachine Learning, Deep Learning & CV: \nTensorFlow, Keras, PyTorch, Scikit-Learn, OpenCV, Convolutional Neural Networks (CNNs / VGG-13), Transfer Learning, Matrix Factorization (SVD), Decision Trees, K-Nearest Neighbors (KNN), Naive Bayes, Data Augmentation, Hyperparameter Tuning (L2 Regularization, Dropout, Early Stopping), Predictive Analytics, Recommender Systems, RMSE Metrics, MLOps. \n\nBackend, APIs & Workflow Orchestration: \nn8n (Workflow Automation), Flask, FastAPI, RESTful APIs, Bootstrap, React, Headless Ingestion, OAuth (Gmail/Google Drive APIs), Slack API Integration, Cron Scheduling, MQTT. \n\n \n\nCommunity Dreams (NGO) \n\nAI & Automation Engineer | Dec 2025 – Present \n\nArchitected an end-to-end Multi-Agent Grant Intelligence pipeline to automate the ingestion and evaluation of 50+ page government RFPs, reducing manual staff review time by 94% (from 3 hours to 10 minutes per document). \n\nEngineered robust data ingestion pipelines using Python to securely extract daily grant opportunities directly from Grants.gov REST APIs and RSS feeds, replacing brittle web scrapers with highly reliable data streams. \n\nImplemented a deterministic Regex-based Python rules engine to act as a hard pre-filter, automatically dropping legally incompatible grants prior to LLM processing to drastically reduce API compute costs. \n\nDeveloped an evaluation agent utilizing Google Vertex AI (Gemini) and a custom RAG architecture to cross-reference complex RFP constraints against the NGO’s internal knowledge base of historical metrics and budgets. \n\nEnforced strict model grounding by configuring the Vertex AI agent to output validated JSON containing match scores, compliance risks, and exact document page citations, enabling rapid human verification and preventing hallucinations. \n\nOrchestrated a conditional generative workflow where RFPs scoring above an 80% threshold automatically triggered a secondary LLM agent to draft a preliminary Letter of Inquiry (LOI) and a customized missing-information checklist. \n\nAutomated end-to-end document compilation by writing scripts to dynamically inject structured JSON outputs into a LaTeX compiler, generating highly formatted, standardized \"Grant Opportunity Brief\" PDFs. \n\nStreamlined enterprise delivery by securely routing all generated PDFs to Amazon S3 and integrating the Slack API to trigger real-time, actionable alerts for NGO directors. \n\nDesigned the architecture strictly as a \"Human-in-the-Loop\" decision support system, ensuring the AI handled heavy document processing while directors maintained absolute authority over final submissions. \n\n \n\nDreamStudio Model.Earth \n\nAI Engineer | May 2025 – Nov 2025 \n\nEngineered an enterprise Retrieval-Augmented Generation (RAG) system unifying 10,000+ scattered technical documents in Amazon S3, enabling natural language querying that reduced manual engineering search time by 70%. \n\nBuilt automated document ingestion pipelines using AWS Textract to perform robust OCR, successfully extracting clean, usable text from complex, unstructured scanned PDFs and Markdown files. \n\nDeveloped advanced data preprocessing workflows natively within Amazon SageMaker using LangChain to clean formatting artifacts, apply metadata tags, and execute context-aware smart chunking (500–1000 tokens, 200-token overlap). \n\nTransformed unstructured text chunks into high-dimensional semantic representations using Amazon Titan Embeddings, indexing the vectors into an Amazon OpenSearch database for highly scalable storage and retrieval. \n\nArchitected a Hybrid Retrieval search engine within OpenSearch, merging BM25 exact-keyword matching (for technical IDs/acronyms) with Vector Similarity search to achieve sub-second, highly relevant context retrieval. \n\nDeployed Claude 3.5 Sonnet via AWS Bedrock to serve as the core generative engine, capitalizing on its fast inference latency and superior instruction-following capabilities for complex technical question-answering. \n\nEliminated model hallucinations by engineering strict, citation-based prompt templates via LangChain, forcing the AI to ground all answers exclusively in retrieved S3 context and achieving a 97% retrieval precision rate. \n\nEstablished comprehensive LLMOps observability by integrating AWS X-Ray to trace millisecond latency across the end-to-end retrieval-generation workflow. \n\nMonitored system reliability and API performance using Amazon CloudWatch, implementing custom dashboards to track system health, identify query bottlenecks, and debug retrieval failures in real-time. \n\n \n\nBig Data Science Research Solutions \n\nCloud Data Engineer | Dec 2022 – Jan 2024 \n\nArchitected a highly scalable ETL pipeline using AWS Glue (PySpark) to ingest, clean, and deduplicate millions of daily EHR medical records from Amazon S3 into an Amazon Redshift data warehouse, serving as the primary training engine for predictive ML models. \n\nEngineered a high-throughput, real-time streaming architecture using Apache Kafka deployed on Kubernetes (Amazon EKS) and EC2 to capture live MQTT telemetry data from cellular IoT biosensor patches via AWS IoT Core, reducing data ingestion latency by 60%. \n\nDesigned an event-driven anomaly detection system using Amazon EventBridge and AWS Lambda to instantly scan incoming IoT data streams, automatically routing corrupted or dropped packets to Amazon DynamoDB to enable zero-delay adjustments for downstream ML models. \n\nSecured highly sensitive healthcare data by provisioning locked-down, private cloud infrastructure within an AWS VPC using Terraform, implementing strict AWS IAM least-privilege roles and automated PII masking protocols to ensure regulatory compliance. \n\nFacilitated secure external hospital data uploads via AWS Transfer Family (SFTP) into isolated S3 buckets, and configured Amazon Athena to enable data scientists to execute complex, serverless SQL queries directly against raw JSON/CSV files for ad-hoc hypothesis testing. \n\nSpearheaded a cloud FinOps initiative by profiling and refactoring slow-running PySpark code within AWS Glue jobs and right-sizing underlying EC2 compute nodes, successfully reducing the total AWS cloud compute bill by 15%. \n\nAutomated the provisioning, scaling, and deployment of containerized and serverless data infrastructure using a dual IaC approach with Terraform and AWS CloudFormation, significantly accelerating deployment lifecycles and standardizing environments. \n\nEnsured highly reliable pipeline execution by implementing comprehensive monitoring, distributed logging, and alerting systems using Amazon CloudWatch dashboards, proactively preventing system crashes across the microservices architecture. \n\nBridged the gap between data engineering and machine learning by designing a structured Bronze/Silver/Gold data lake topology, ensuring ML research teams had continuous, high-fidelity access to both historical batch data and low-latency streaming features. \n\n \n\nProject 1: Readify – ML Recommendation Engine \n\nTech: Python, Flask, Scikit-Learn, Machine Learning, Matrix Factorization, MLOps | Jan 2024 – May 2024 \n\n \n\nEngineered a full-stack, highly personalized Machine Learning recommendation engine designed to overcome sparse dataset limitations and predict user preferences. \n\nDesigned a rigorous ML evaluation pipeline to benchmark and backtest six distinct classification algorithms, including Decision Trees, K-Nearest Neighbors (KNN), and Naive Bayes. \n\nSolved severe sparse data constraints by implementing Collaborative Filtering via Singular Value Decomposition (SVD), utilizing matrix factorization to successfully map latent relationships between users and items. \n\nTracked and optimized rigorous statistical performance metrics, analyzing Precision-Recall curves to achieve an RMSE (Root Mean Square Error) of 0.89 and a peak model accuracy of 83%. \n\nTransitioned the model from a Jupyter Notebook research environment into a production-ready RESTful inference pipeline using Flask, enabling sub-second, dynamic recommendation generation. \n\nDeveloped a responsive frontend utilizing Bootstrap and JavaScript to allow users to upload localized datasets and seamlessly interact with the underlying predictive API. \n\nProject 2: TrueVision – Real-Time Computer Vision System \n\nTech: Python, TensorFlow, Keras, OpenCV, Deep Learning, CNNs, VGG-13 | Jun 2024 – Jul 2024 \n\nArchitected a real-time Computer Vision accessibility application engineered to provide visually impaired individuals with instant audio feedback translating human facial expressions. \n\nDesigned and trained a Convolutional Neural Network (CNN) based on the VGG-13 architecture to classify complex, nuanced human emotions using the 36,000+ image FER2013 dataset. \n\nOvercame strict data limitations and lighting variance by applying aggressive Data Augmentation techniques and utilizing Transfer Learning from pre-trained ImageNet model weights. \n\nPrevented severe neural network overfitting by implementing mathematical constraints including L2 Regularization, tuning Dropout rates to 0.5, and utilizing validation-loss Early Stopping. \n\nSuccessfully forced the network to learn robust, generalized facial features, achieving a peak evaluation accuracy of 78% and reducing false positives on highly nuanced emotions (e.g., fear vs. disgust) by 18%. \n\nIntegrated the optimized deep learning model with OpenCV to capture and process live video streaming feeds, ensuring low-latency, real-time edge inference. \n\nProject 3: StreamFlix – ML Feature Pipeline & Churn Analytics \n\nTech: SQL, Relational Databases, Data Engineering, Query Profiling, Predictive Analytics |Jan 2024 – May 2024 \n\nEngineered a high-performance predictive analytics pipeline designed to identify at-risk users, calculate Customer Lifetime Value (CLV), and drive Customer Churn prevention models. \n\nArchitected a highly normalized, Boyce-Codd Normal Form (BCNF) relational database to systematically track millions of customer interactions, billing histories, and product subscriptions. \n\nConducted extensive query execution plan analysis to identify heavy data retrieval bottlenecks caused by complex SQL joins during ML feature extraction. \n\nStrategically eliminated expensive sequential table scans by implementing Composite Indexing across heavily joined columns (CustomerID, SubscriptionStartDate). \n\nDrastically improved database retrieval speeds through targeted indexing, reducing complex query execution time by over 50% (from 6.7 milliseconds down to 3.1 milliseconds). \n\nEnsured seamless, near real-time data availability for downstream Data Scientists, bridging the gap between raw relational data and high-fidelity machine learning feature pipelines. \n\n \n\nProject 4: AutoApply AI – Autonomous Agentic Workflow \n\nTech: n8n, Google Vertex AI (Gemini), JavaScript, REST APIs, Jina AI, Regex, LaTeX | Apr 2026 – Present \n\nArchitected an autonomous Agentic AI workflow utilizing n8n to orchestrate end-to-end job sourcing, semantic evaluation, and dynamic document generation, eliminating 3+ hours of manual daily processing. \n\nEngineered headless data ingestion pipelines leveraging the Jina AI API to reliably extract clean, semi-structured text from complex web pages and LinkedIn job postings, bypassing traditional scraping bottlenecks. \n\nDesigned a deterministic JavaScript and Regex rules engine to act as a pre-LLM firewall, instantly rejecting non-compliant (1099/C2C) opportunities to guarantee visa constraints and drastically reduce API compute costs. \n\nOrchestrated a multi-agent evaluation framework using Google Vertex AI (Gemini 2.5 Pro), deploying an \"Evaluator Agent\" to semantically score job requirements against a master historical database of skills and experiences. \n\nEnforced strict zero-hallucination constraints on a secondary \"Tailor Agent\" through advanced prompt engineering, transforming matched data into highly structured JSON outputs without fabricating technical claims. \n\nAutomated end-to-end document rendering by writing scripts to dynamically map AI-generated JSON outputs into LaTeX templates, invoking external REST APIs to compile pixel-perfect, ATS-compliant PDFs. \n\nStreamlined delivery and monitoring by integrating Google Drive/Sheets APIs and Gmail OAuth to securely route finalized PDFs, log pipeline metrics, and trigger real-time notifications for high-confidence matches. \n\nImplemented robust scheduling using cron-based triggers to execute the headless pipeline at standard intervals, ensuring continuous, automated lead generation and error-handling without manual intervention. \n\nEducation:\nState University of New York at Buffalo | Jan 2024 – May 2025\nMaster of Science in Computer Science\n\nIIITDM Jabalpur | Jul 2019 – May 2023\nBachelor's of Science in Computer Science and Engineering\n\nCertifications:\nAWS Certified Solutions Architect – Associate | Issued: Mar 2024 | Credential ID: 65b51979b0c548cdbc8472fd6a3c2034\n\nTASKS:\n1) CHAIN OF THOUGHT ANALYSIS:\n   Parse `job_description` into `job_analysis` (extracting tech stack, responsibilities, years of exp).\n   Parse `my_resume` into `resume_analysis` (extracting core skills, domains, accomplishments).\n\n2) SEMANTIC HARD REJECT (Visa & Enrollment):\n   Analyze the JD for strict constraints. Set `semantic_hard_reject` to true ONLY if:\n   - \"No sponsorship\", \"Will not sponsor now or in future\", \"Must be US Citizen/Green Card holder\".\n   - \"C2C only\", \"Corp-to-Corp\", \"1099\", \"Independent Contractor\".\n   - The job explicitly states \"Must be currently enrolled in school\" or \"Pursuing a degree\". \n   *(Note: If it is an internship, but does NOT explicitly require current school enrollment, leave `semantic_hard_reject` as false).*\n   If rejected, provide a short 1-sentence `reject_reason`. Otherwise, set it to \"Clean\".\n\n3) ROOT-CAUSE SCORING (integer 0–100):\n   Compare your analysis. Calculate strictly using this ATS rubric:\n   - Core Tech Stack & Keywords (40 pts): Exact matches between JD and Resume.\n   - Applied Engineering & Impact (30 pts): Does the resume show production-level execution (APIs, RAG, pipelines) rather than just toy projects?\n   - Years of Experience Alignment (20 pts): Does my ~3.5 years of enterprise/academic experience meet the JD's requirement? \n   - Education & Certifications (10 pts): Do I meet the degree (M.S. CS) and certification (AWS) requirements?\n\nSTRICT CONTENT RULES:\n- Every array element must be a short phrase (≤ 140 chars).\n- Escape all quotes (\") as (\\\") inside JSON values. No trailing commas.\n\nSCHEMA:\n```json\n{\n  \"job_analysis\": {\n    \"title\": \"\",\n    \"company\": \"\",\n    \"must_have_skills\":[],\n    \"years_of_experience\": \"\",\n    \"tech_stack\": []\n  },\n  \"resume_analysis\": {\n    \"core_skills\":[],\n    \"tools_tech\": {\n      \"programming_languages\": [],\n      \"cloud_devops\":[]\n    }\n  },\n  \"semantic_hard_reject\": false,\n  \"reject_reason\": \"Clean\",\n  \"match_score\": 0,\n  \"score_explanation\":[\n    { \"category\": \"Core Tech Stack (40 pts)\", \"score\": 0, \"evidence\": \"...\" },\n    { \"category\": \"Applied Engineering & Impact (30 pts)\", \"score\": 0, \"evidence\": \"...\" },\n    { \"category\": \"Years of Experience Alignment (20 pts)\", \"score\": 0, \"evidence\": \"...\" },\n    { \"category\": \"Education & Certifications (10 pts)\", \"score\": 0, \"evidence\": \"...\" }\n  ]\n}\nEND_OF_JSON",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -880,
+        1040
+      ],
+      "id": "27007e42-06e7-499c-a298-93a23224c0a8",
+      "name": "AI Agent 1",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -192,
+        1232
+      ],
+      "id": "01ac06c2-7386-4db7-b471-9677fe03f7f3",
+      "name": "Wait1",
+      "webhookId": "2147a078-dfd6-4bea-b83c-ec8339723ac7"
+    },
+    {
+      "parameters": {
+        "maxItems": 15
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        752,
+        576
+      ],
+      "id": "5e5cce51-bb46-4a03-a956-c154dfe95c48",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1. Get the JSON output from AI Agent 2 and clean it\nlet rawText = $input.item.json.output || \"\";\nrawText = rawText.replace(/```json/gi, \"\").replace(/```/g, \"\").trim();\n\nlet data;\ntry {\n    data = JSON.parse(rawText);\n} catch (e) {\n    throw new Error(\"AI did not return valid JSON. Raw output was: \" + rawText);\n}\n\n// 2. Helper function to safely escape LaTeX characters\nfunction escapeTex(str) {\n    if (!str) return \"\";\n    return str.replace(/\\\\/g, '\\\\textbackslash ')\n              .replace(/([&%$#_{}])/g, '\\\\$1')\n              .replace(/~/g, '\\\\textasciitilde ')\n              .replace(/\\^/g, '\\\\textasciicircum ');\n}\n\n// 3. Build Experience Section (Dynamically from AI)\nlet experienceLatex = \"\";\nif (data.experiences) {\n    data.experiences.forEach(exp => {\n        experienceLatex += `\n  \\\\resumeSubheading\n    {${escapeTex(exp.company)}}{${escapeTex(exp.dates)}}\n    {${escapeTex(exp.title)}}{}`;\n        \n        experienceLatex += `\\n  \\\\resumeItemListStart`;\n\n        \n        exp.bullets.forEach(bullet => {\n            experienceLatex += `\\n    \\\\resumeItem{${escapeTex(bullet)}}`;\n        });\n        experienceLatex += `\\n  \\\\resumeItemListEnd\\n`;\n    });\n}\n\n// 4. Build Projects Section (Dynamically from AI)\nlet projectsLatex = \"\";\nif (data.projects) {\n    data.projects.forEach(proj => {\n        projectsLatex += `\n  \\\\resumeProjectHeading\n    {\\\\textbf{${escapeTex(proj.title)}}`/* | \\\\emph{${escapeTex(proj.tech)}}*/ + `}{${escapeTex(proj.dates)}}\n  \\\\resumeItemListStart`;\n        \n        proj.bullets.forEach(bullet => {\n            projectsLatex += `\\n    \\\\resumeItem{${escapeTex(bullet)}}`;\n        });\n        projectsLatex += `\\n  \\\\resumeItemListEnd\\n`;\n    });\n}\n\n// 5. The Master LaTeX Skeleton (Structure & Hardcoded Sections)\nconst finalLatex = `\\\\documentclass[letterpaper,10pt]{article}\n\\\\usepackage{latexsym}\n\\\\usepackage[margin=0.2in]{geometry} % <--- THIS CONTROLS YOUR BORDERS\n\\\\usepackage{titlesec}\n\\\\usepackage{marvosym}\n\\\\usepackage[usenames,dvipsnames]{color}\n\\\\usepackage{enumitem}\n\\\\usepackage[colorlinks=true, urlcolor=RoyalBlue]{hyperref}\n\\\\usepackage{fancyhdr}\n\\\\usepackage{babel}\n\\\\usepackage{tabularx}\n\\\\usepackage{fontawesome5}\n\\\\usepackage{multicol}\n\\\\input{glyphtounicode}\n\n\\\\pagestyle{fancy}\n\\\\fancyhf{}\n\\\\renewcommand{\\\\headrulewidth}{0pt}\n\\\\renewcommand{\\\\footrulewidth}{0pt}\n\\\\urlstyle{same}\n\\\\raggedbottom\n\\\\raggedright\n\\\\setlength{\\\\tabcolsep}{0in}\n\\\\titleformat{\\\\section}{\\\\vspace{-4pt}\\\\scshape\\\\raggedright\\\\large\\\\bfseries}{}{0em}{}[\\\\color{black}\\\\titlerule \\\\vspace{-5pt}]\n\\\\pdfgentounicode=1\n\n\\\\newcommand{\\\\resumeItem}[1]{\\\\item\\\\small{{#1 \\\\vspace{-2pt}}}}\n\\\\newcommand{\\\\resumeSubheading}[4]{\\\\vspace{-2pt}\\\\item\\\\begin{tabular*}{1.0\\\\textwidth}{l@{\\\\extracolsep{\\\\fill}}r}\\\\textbf{#1} & \\\\textbf{\\\\small #2} \\\\\\\\\\\\textit{\\\\small #3} & \\\\textit{\\\\small #4}\\\\end{tabular*}\\\\vspace{-7pt}}\n\\\\newcommand{\\\\resumeProjectHeading}[2]{\\\\item\\\\begin{tabular*}{1.0\\\\textwidth}{l@{\\\\extracolsep{\\\\fill}}r}\\\\small #1 & \\\\textbf{\\\\small #2}\\\\end{tabular*}\\\\vspace{-7pt}}\n\\\\newcommand{\\\\resumeSubHeadingListStart}{\\\\begin{itemize}[leftmargin=0in,label={}]} \n\\\\newcommand{\\\\resumeSubHeadingListEnd}{\\\\end{itemize}}\n\\\\newcommand{\\\\resumeItemListStart}{\\\\begin{itemize}}\n\\\\newcommand{\\\\resumeItemListEnd}{\\\\end{itemize}\\\\vspace{-5pt}}\n\n\\\\begin{document}\n\\\\begin{center}\n    {\\\\Huge \\\\textbf{Prabhas Vardhan Reddy Sama}} \\\\\\\\ \\\\vspace{2pt}\n    \\\\small [YOUR PHONE NUMBER] \\\\ $|$ \\\\ \n    \\\\href{mailto:[YOUR EMAIL]}{[YOUR EMAIL]} \\\\ $|$ \\\\ \n    \\\\href{https://www.linkedin.com/in/prabhas-sama1/}{linkedin.com/in/prabhas-sama1}` /* \\\\ $|$ \\\\ \n    \\\\href{https://github.com/Prabhas777}{\\\\faGithub\\\\ github.com/Prabhas777} */ + `\n\\\\end{center}\n\\\\vspace{-14pt}\n\n\\\\section{Summary}\n\\\\begin{itemize}[leftmargin=0.15in, label={}]\n\\\\item \\\\small{${escapeTex(data.summary)}}\n\\\\end{itemize}\n\\\\vspace{-14pt}\n\n\\\\section{Education}\n\\\\resumeSubHeadingListStart\n  \\\\resumeSubheading\n    {State University of New York at Buffalo}{Jan 2024 -- May 2025}\n    {M.S. in Computer Science}{Buffalo, NY}\n  \\\\resumeSubheading\n    {IIITDM Jabalpur}{Jul 2019 -- May 2023}\n    {B.Tech in Computer Science and Engineering}{Jabalpur, India}\n\\\\resumeSubHeadingListEnd\n\\\\vspace{-10pt}\n\n\\\\section{Technical Skills}\n\\\\begin{itemize}[leftmargin=0.1in, label={}]\n  \\\\item \\\\small{\n      \\\\textbf{Languages \\\\& Core Utilities:} ${escapeTex(data.skills_languages)} \\\\\\\\\n      \\\\textbf{Cloud Computing \\\\& DevOps:} ${escapeTex(data.skills_cloud_devops)} \\\\\\\\\n      \\\\textbf{Data Engineering \\\\& Big Data:} ${escapeTex(data.skills_data_engineering)} \\\\\\\\\n      \\\\textbf{GenAI, LLMs \\\\& Agents:} ${escapeTex(data.skills_genai_llms)} \\\\\\\\\n      \\\\textbf{ML, Deep Learning \\\\& CV:} ${escapeTex(data.skills_ml_cv)} \\\\\\\\\n      \\\\textbf{Backend, APIs \\\\& Workflows:} ${escapeTex(data.skills_backend_apis)}\n  }\n\\\\end{itemize}\n\\\\vspace{-14pt}\n\n\\\\section{Experience}\n\\\\resumeSubHeadingListStart\n${experienceLatex}\n\\\\resumeSubHeadingListEnd\n\\\\vspace{-14pt}\n\n\\\\section{Key Projects}\n\\\\resumeSubHeadingListStart\n${projectsLatex}\n\\\\resumeSubHeadingListEnd\n\\\\vspace{-14pt}\n\n\\\\section{Certifications}\n\\\\begin{itemize}[leftmargin=0.15in, label={}]\n  \\\\item \\\\small{\n    \\\\textbf{AWS Certified Solutions Architect -- Associate} | Issued: Mar 2024 | \\\\href{https://cp.certmetrics.com/amazon/en/public/verify/credential/65b51979b0c548cdbc8472fd6a3c2034}{Verify}\n  }\n\\\\end{itemize}\n\n\\\\end{document}`;\n\n// Output the final LaTeX to save to Google Sheets\nreturn {\n  json: {\n    output: finalLatex\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        1216
+      ],
+      "id": "02932329-6d9a-4f13-bab1-0b9381ff79a3",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        800
+      ],
+      "id": "7c5703ac-8e76-4144-85cd-a6e5782ad637",
+      "name": "Wait-2",
+      "webhookId": "9dffa986-b8eb-4d7a-8707-64e88bc0cc09"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -944,
+        784
+      ],
+      "id": "37c89132-84f1-4716-99ec-1a66ed1a0735",
+      "name": "Wait-1",
+      "webhookId": "12409f66-fbe7-48bd-b9d7-68449f197264"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://latex.ytotech.com/builds/sync",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"compiler\": \"pdflatex\",\n  \"resources\":[\n    {\n      \"main\": true,\n      \"content\": {{ JSON.stringify($('Code in JavaScript').item.json.output) }}\n    }\n  ]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        496,
+        1216
+      ],
+      "id": "4095bc21-1164-4360-bcc3-3961b95c015a",
+      "name": "HTTP Request1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "name": "=Prabhas_Sama_{{ $('Edit Fields').item.json.Company }}_Resume.pdf",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1h3ce7eH6gSmjRiNqAHnqqFi2nmSJlED0",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        704,
+        1216
+      ],
+      "id": "73e46e03-f4eb-419f-b10e-9139d7106fa2",
+      "name": "Upload file",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "qmLYZAc3kHygKMtj",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Search URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Search URL": {
+      "main": [
+        [
+          {
+            "node": "Fetch jobs from LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch jobs from LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait-1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Pre-Filter Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Vertex Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Vertex Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent 2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Filter Logic": {
+      "main": [
+        [
+          {
+            "node": "Is Job Good?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Job Good?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait-2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent 1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait-2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait-1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "35f85b9b-2742-4221-a879-8bab4061e8a2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9a19c768eb595804c4eb9c642fe690e5365b043a76e128b5bb49182bc591af1c"
+  },
+  "id": "teydtpA0ydX1w83K",
+  "tags": []
+}
