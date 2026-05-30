@@ -1,5 +1,8 @@
 🚀 Autonomous Agentic Job Search Pipeline
 
+<img width="1598" height="768" alt="image" src="https://github.com/user-attachments/assets/ec0daeb3-9faa-4c8a-960d-169aca37bd24" />
+
+
 An end-to-end, LLM-powered orchestration pipeline that scrapes, filters, scores,
 and dynamically generates pixel-perfect LaTeX resumes without hallucination.
 
